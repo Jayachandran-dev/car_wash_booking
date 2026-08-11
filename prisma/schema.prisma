@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  bookings     Booking[]
+
+  @@map("users")
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  carType   String
+  package   String   // "basic" | "premium"
+  date      DateTime @db.Date
+  timeSlot  String   // "09:00", "10:00", ..., "17:00"
+  status    String   @default("booked") // "booked" | "cancelled"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Uniqueness constraint prevents double-booking at the database level
+  // for active bookings. Cancelled bookings free the slot.
+  @@unique([date, timeSlot], name: "unique_active_slot")
+  @@index([userId])
+  @@index([date, status])
+  @@map("bookings")
+}
