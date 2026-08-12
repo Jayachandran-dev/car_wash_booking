@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
+// Helper: create a Date for a given date + timeSlot in IST
+function getSlotDateTimeIST(dateStr: string, timeSlot: string): Date {
+  // date comes from DB as Date object → convert to YYYY-MM-DD
+  const d = new Date(dateStr);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const dateOnly = `${year}-${month}-${day}`;
+
+  return new Date(`${dateOnly}T${timeSlot}:00+05:30`);
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -33,11 +45,9 @@ export async function DELETE(
       );
     }
 
-    // Check if the slot has already occurred
+    // Check if the slot has already occurred (using IST)
     const now = new Date();
-    const bookingDateTime = new Date(booking.date);
-    const [hours] = booking.timeSlot.split(":").map(Number);
-    bookingDateTime.setUTCHours(hours, 0, 0, 0);
+    const bookingDateTime = getSlotDateTimeIST(booking.date.toISOString(), booking.timeSlot);
 
     if (bookingDateTime <= now) {
       return NextResponse.json(
@@ -46,9 +56,6 @@ export async function DELETE(
       );
     }
 
-    // Delete on cancel so the unique(date, timeSlot) constraint frees the slot
-    // for future bookings. (Status-based soft delete would require a partial
-    // unique index which we can add with more time.)
     await prisma.booking.delete({
       where: { id },
     });

@@ -4,6 +4,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { bookingSchema, TIME_SLOTS } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 
+// Helper: create a Date for a given date + timeSlot in IST
+function getSlotDateTimeIST(dateStr: string, timeSlot: string): Date {
+  return new Date(`${dateStr}T${timeSlot}:00+05:30`);
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -67,6 +72,7 @@ export async function POST(req: NextRequest) {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
     );
 
+    // Block past dates
     if (date < today) {
       return NextResponse.json(
         { error: "Cannot book a past date" },
@@ -74,11 +80,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use a transaction to enforce no double-booking at query level
-    // Unique constraint on (date, timeSlot) provides DB-level protection
+    // Block past time slots using IST
+    const slotDateTime = getSlotDateTimeIST(dateStr, timeSlot);
+    if (slotDateTime <= now) {
+      return NextResponse.json(
+        { error: "Cannot book a time slot that has already passed" },
+        { status: 400 }
+      );
+    }
+
+    // Transaction + unique constraint for double-booking prevention
     try {
       const booking = await prisma.$transaction(async (tx) => {
-        // Check existing active booking for this slot
         const existing = await tx.booking.findFirst({
           where: {
             date,

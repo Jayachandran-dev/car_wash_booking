@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { TIME_SLOTS } from "@/lib/validations";
 
+// Helper: create a Date for a given date + timeSlot in IST (Asia/Kolkata)
+function getSlotDateTimeIST(dateStr: string, timeSlot: string): Date {
+  // Example: "2026-08-12" + "09:00" → 2026-08-12T09:00:00+05:30
+  return new Date(`${dateStr}T${timeSlot}:00+05:30`);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -32,7 +38,17 @@ export async function GET(req: NextRequest) {
     });
 
     const bookedSlots = new Set(existing.map((b) => b.timeSlot));
-    const available = TIME_SLOTS.filter((slot) => !bookedSlots.has(slot));
+    const now = new Date();
+
+    const available = TIME_SLOTS.filter((slot) => {
+      if (bookedSlots.has(slot)) return false;
+
+      // Block past slots using IST time
+      const slotTime = getSlotDateTimeIST(dateStr, slot);
+      if (slotTime <= now) return false;
+
+      return true;
+    });
 
     return NextResponse.json({
       date: dateStr,
