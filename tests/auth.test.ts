@@ -1,20 +1,20 @@
-import bcrypt from "bcryptjs";
+/**
+ * Unit tests for password hashing / verification.
+ * Imports the real functions from src/lib/auth.ts
+ */
 
-// Pure unit tests for password hashing / verification logic
-// (mirrors src/lib/auth.ts without Next.js dependencies)
+// Mock Next.js and Prisma so the auth module can be imported in Jest
+jest.mock("next/headers", () => ({
+  cookies: jest.fn(),
+}));
 
-async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
-}
+jest.mock("@/lib/prisma", () => ({
+  prisma: {},
+}));
 
-async function verifyPassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
+import { hashPassword, verifyPassword } from "@/lib/auth";
 
-describe("Password hashing and verification", () => {
+describe("Password hashing and verification (real auth module)", () => {
   it("hashes a password to a non-plaintext bcrypt string", async () => {
     const password = "SecurePass1";
     const hash = await hashPassword(password);

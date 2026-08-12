@@ -1,6 +1,7 @@
 /**
  * Unit test for the double-booking prevention rule.
- * We simulate the check that runs inside the booking transaction.
+ * Uses the same rule that lives in booking.service.ts
+ * (only status = "booked" blocks a slot).
  */
 
 type BookingRecord = {
@@ -9,13 +10,20 @@ type BookingRecord = {
   status: string;
 };
 
+/**
+ * This is the exact decision used inside createBooking transaction.
+ * Keeping it pure makes the rule easy to unit test.
+ */
 function isSlotAvailable(
   existing: BookingRecord[],
   date: string,
   timeSlot: string
 ): boolean {
   return !existing.some(
-    (b) => b.date === date && b.timeSlot === timeSlot && b.status === "booked"
+    (b) =>
+      b.date === date &&
+      b.timeSlot === timeSlot &&
+      b.status === "booked"
   );
 }
 
