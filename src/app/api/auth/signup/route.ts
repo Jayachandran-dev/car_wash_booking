@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createToken, setAuthCookie } from "@/lib/auth";
 import { signupSchema } from "@/lib/validations";
+import { success, error, serverError } from "@/lib/api-helpers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,20 +10,14 @@ export async function POST(req: NextRequest) {
     const parsed = signupSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten() },
-        { status: 400 }
-      );
+      return error("Validation failed", 400, parsed.error.flatten());
     }
 
     const { email, password, name } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return NextResponse.json(
-        { error: "Email already registered" },
-        { status: 409 }
-      );
+      return error("Email already registered", 409);
     }
 
     const passwordHash = await hashPassword(password);
@@ -39,15 +34,11 @@ export async function POST(req: NextRequest) {
     const token = await createToken({ userId: user.id, email: user.email });
     await setAuthCookie(token);
 
-    return NextResponse.json(
+    return success(
       { user, message: "Account created successfully" },
-      { status: 201 }
+      201
     );
-  } catch (error) {
-    console.error("Signup error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch (err) {
+    return serverError(err, "Signup error");
   }
 }

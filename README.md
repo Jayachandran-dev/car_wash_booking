@@ -5,11 +5,37 @@ Small full-stack application demonstrating secure authentication and conflict-fr
 ## Stack
 
 - **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS (minimal styling)
-- **Backend**: Next.js Route Handlers (Node.js / TypeScript) — same process as the frontend for simplicity and shared types
+- **Backend**: Next.js Route Handlers (Node.js / TypeScript)
 - **Database**: PostgreSQL via Prisma ORM
 - **Auth**: JWT stored in HTTP-only cookies + bcrypt password hashing
 - **Validation**: Zod
 - **Tests**: Jest (3 unit tests covering the required areas)
+
+## Architecture
+
+The codebase follows a clean layered structure to keep business logic separate from HTTP handling and to avoid duplication (DRY):
+
+
+## Folder structure
+src/
+├── app/api/                 # Thin route handlers (controllers)
+├── services/                # Business logic layer
+│   ├── booking.service.ts
+│   └── slot.service.ts
+├── lib/                     # Shared utilities
+│   ├── auth.ts              # Password hashing, JWT, cookies
+│   ├── datetime.ts          # IST timezone helpers
+│   ├── api-helpers.ts       # requireAuth, success/error responders
+│   ├── validations.ts       # Zod schemas
+│   └── prisma.ts
+└── middleware.ts            # Route protection
+
+
+
+**Key design decisions:**
+- Route handlers stay thin — they only parse input, call a service, and return a response.
+- All booking rules (past slot check, double-booking prevention, cancel rules) live in the service layer.
+- Shared helpers (`requireAuth`, `success`, `error`, IST date utilities) eliminate repeated code across routes.
 
 ### Why this backend choice?
 
@@ -26,14 +52,12 @@ A dedicated Express backend would be preferred for a larger multi-client system 
 
 **Chosen: JWT in HTTP-only cookies.**
 
-Trade-offs considered:
-
-| Aspect              | JWT (chosen)                          | Server sessions                     |
-|---------------------|---------------------------------------|-------------------------------------|
-| State               | Stateless                             | Requires session store (Redis/DB)   |
-| Scaling             | Easy horizontal scaling               | Sticky sessions or shared store     |
-| Revocation          | Harder (need short expiry / blacklist)| Easy (delete session)               |
-| Complexity for this task | Low                               | Extra infrastructure                |
+| Aspect                    | JWT (chosen)                          | Server sessions                     |
+|---------------------------|---------------------------------------|-------------------------------------|
+| State                     | Stateless                             | Requires session store (Redis/DB)   |
+| Scaling                   | Easy horizontal scaling               | Sticky sessions or shared store     |
+| Revocation                | Harder (need short expiry / blacklist)| Easy (delete session)               |
+| Complexity for this task  | Low                                   | Extra infrastructure                |
 
 For a prototype with no logout-everywhere requirement and a single server, JWT keeps the surface area small while still protecting routes via middleware. Tokens expire after 7 days. Cookies are `httpOnly` + `sameSite=lax` to mitigate XSS/CSRF basics.
 
@@ -70,6 +94,7 @@ model Booking {
 - `@@unique([date, timeSlot])` enforces that two active bookings cannot share the same slot at the database level (Prisma raises P2002 on conflict). Combined with an explicit check inside a transaction, this satisfies the “enforced at the database/query level” requirement.
 - On cancel we **delete** the row so the unique constraint immediately frees the slot for re-booking. (A partial unique index on `WHERE status = 'booked'` would be the production refinement.)
 - Fixed 1-hour slots 09:00–17:00 are generated in application code; only free ones are returned by `/api/slots`.
+All time comparisons use IST (Asia/Kolkata) so past slots are correctly blocked for Indian users.
 
 ## Setup (local)
 
