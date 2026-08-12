@@ -142,7 +142,7 @@ npm test
 - Docker Compose for one-command Postgres + app.
 - E2E tests (Playwright) for the full booking flow.
 - Admin view of all bookings / slot management.
-- Email confirmation / reminders.
+- Email/WhatsApp - confirmation / reminders.
 
 ## AI tooling
 
