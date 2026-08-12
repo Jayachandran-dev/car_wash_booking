@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireAuth, success, serverError } from "@/lib/api-helpers";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const auth = await requireAuth();
+    if ("error" in auth) return auth.error;
+
+    return success({ user: auth.user });
+  } catch (err) {
+    return serverError(err, "Me error");
   }
-  return NextResponse.json({ user });
 }
